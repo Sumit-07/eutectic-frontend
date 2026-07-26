@@ -26,19 +26,42 @@
 /* Scan this app's own source for class names; nothing outside it. */
 @source '../';
 
-/* frontend-spec §1 (row 12) — prose measure is capped at 64ch, always. There is no
-   measure namespace in packages/tokens yet, and §1 (row 17) bans arbitrary values,
-   so the cap lives here as a real utility rather than as an arbitrary max-width
-   bracket value on a page.
-   Delete this the day a measure token lands in packages/tokens. */
-@utility measure {
-  max-inline-size: 64ch;
-}
+/*
+ * M0-FE-02 / D-012 — the local `@utility measure` block that used to live here
+ * is deleted: `packages/tokens` (M0-SH-09) now emits `measure` / `measure-idea`
+ * / `measure-argument` utilities straight from tokens.css, so every consumer
+ * reads the same source of truth this file already imports at the top.
+ */
 
 @layer base {
+  /*
+   * next/font/local (src/fonts/index.ts) generates a hashed, unpredictable
+   * family name per build for each of the three faces, so the literal
+   * 'Newsreader' / 'Instrument Sans' / 'Commit Mono' strings baked into
+   * `packages/tokens`' --eu-font-prose/ui/mono (M0-SH-09) can never match
+   * what actually loaded. This is the one place that seam is bridged: the
+   * three --font-*-loaded variables next/font attaches to <html> (root
+   * layout) override the three --eu-font-* custom properties here, once.
+   * Each --font-*-loaded value next/font generates is already the complete
+   * stack — hashed family, size-adjusted fallback face, then the §6.1
+   * fallback list passed as `fallback` in src/fonts/index.ts — so it is
+   * substituted whole, never re-appended to, here or anywhere else.
+   * Every downstream consumer — Tailwind's font-prose/ui/mono utilities,
+   * the voice-* composites, anything else reading --eu-font-* — keeps
+   * reading tokens and needs no knowledge that next/font is involved.
+   * Nothing else in apps/web restates a family stack.
+   */
+  :root {
+    --eu-font-prose: var(--font-prose-loaded);
+    --eu-font-ui: var(--font-ui-loaded);
+    --eu-font-mono: var(--font-mono-loaded);
+  }
+
   /* Logical properties throughout, for RTL readiness (frontend-spec §1 "Always").
-     No type scale here on purpose: the faces and sizes of §6.1/§6.3 are M0-FE-02,
-     and inventing sizes now would be exactly the hardcoding rule 2 forbids. */
+     No type scale set here: §6.3's text-display…text-micro utilities come from
+     packages/tokens' @theme (M0-SH-09) and are applied per-element, not as a
+     base default — setting one here would be exactly the hardcoding rule 2
+     forbids. */
   html {
     background-color: var(--eu-paper);
     color: var(--eu-ink);
