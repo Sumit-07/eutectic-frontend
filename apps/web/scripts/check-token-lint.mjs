@@ -1,4 +1,5 @@
 // M0-FE-10 — frontend-spec §19.2 / §1 row 17 / CLAUDE.md rule 2.
+// M0-FE-13 / D-021 — the local-tokens exemption is RETIRED, not relaxed.
 //
 //   "A hardcoded hex, px font-size, or arbitrary value outside packages/tokens"
 //
@@ -11,20 +12,18 @@
 //   4. a raw duration in a CSS declaration — `200ms`, `.3s`
 //   5. `!important`
 //
-// ── The one exemption ──────────────────────────────────────────────────────
-// `src/app/globals.css` carries THE sanctioned local-tokens block (D-010,
-// D-012, D-017), delimited by `eutectic:local-tokens:begin` / `:end`. Inside
-// that range, rules 2 (px in a custom property, not a font-size), 4 and the
-// bare-dimension part of the check are lifted: hosting spec literals the tokens
-// package cannot express yet is the block's entire purpose.
+// ── No exemption, anywhere ─────────────────────────────────────────────────
+// `src/app/globals.css` used to carry THE sanctioned local-tokens block
+// (D-010, D-012, D-017), delimited by `eutectic:local-tokens:begin` / `:end`,
+// inside which rules 2 and 4 and the bare-dimension check were lifted.
 //
-// Hex and arbitrary Tailwind values are NOT exempt, inside the block or out.
-// A hex is a colour the tokens package already emits, and an arbitrary value is
-// banned outright by §1 row 17; neither is a "token-shaped value waiting for a
-// home", so neither gets the block's licence.
-//
-// D-017 forecloses a second block. This gate enforces that structurally: it
-// fails if the marker pair appears anywhere but once, in globals.css.
+// M0-SH-13 landed everything that block held in `packages/tokens` (D-021);
+// M0-FE-13 deleted the block. There is no longer anywhere in this app a raw
+// dimension or duration literal is allowed to live — rules 2 and 4 apply to
+// `src/app/globals.css` exactly as they apply to every other file. A
+// `eutectic:local-tokens:begin` or `:end` marker appearing ANYWHERE in the
+// app is now a failure in its own right: the block it used to delimit is
+// retired, and nothing may reopen it (D-021, D-017).
 //
 // ── Known limits, stated rather than hidden ────────────────────────────────
 // This is a lexical gate, not a compiler. It blanks comments before matching
@@ -38,7 +37,7 @@
 import { blankComments, lineOf, lineTextOf, listSourceFiles, read, report } from './lib/sources.mjs';
 
 const GATE = 'token-lint';
-const SPEC = 'frontend-spec §19.2, §1 row 17, CLAUDE.md rule 2';
+const SPEC = 'frontend-spec §19.2, §1 row 17, CLAUDE.md rule 2, D-021';
 
 const BEGIN = 'eutectic:local-tokens:begin';
 const END = 'eutectic:local-tokens:end';
@@ -46,58 +45,23 @@ const END = 'eutectic:local-tokens:end';
 const files = listSourceFiles({ exts: ['.css', '.ts', '.tsx', '.mjs'] });
 const violations = [];
 
-// ── the sanctioned block: find it, and prove it is the only one ────────────
-let sanctioned = null; // { relative, start, end } byte offsets in the raw text
-let markerFiles = 0;
-
+// ── the retired block: any marker anywhere is now a failure ────────────────
 for (const file of files) {
   const raw = read(file);
   const begins = [...raw.matchAll(new RegExp(BEGIN, 'g'))];
   const ends = [...raw.matchAll(new RegExp(END, 'g'))];
   if (begins.length === 0 && ends.length === 0) continue;
-  markerFiles += 1;
 
-  if (file.relative !== 'src/app/globals.css') {
+  for (const m of [...begins, ...ends]) {
     violations.push({
       file: file.relative,
-      line: lineOf(raw, (begins[0] ?? ends[0]).index),
+      line: lineOf(raw, m.index),
       message:
-        'local-tokens markers outside src/app/globals.css — D-017 forecloses a second block',
+        `${BEGIN}/${END} marker found — the local-tokens block is retired (D-021, M0-FE-13); ` +
+        'packages/tokens emits everything it used to hold, so nothing may reopen it',
     });
-    continue;
   }
-  if (begins.length !== 1 || ends.length !== 1) {
-    violations.push({
-      file: file.relative,
-      line: lineOf(raw, (begins[0] ?? ends[0]).index),
-      message: `expected exactly one ${BEGIN}/${END} pair, found ${begins.length}/${ends.length} (D-017)`,
-    });
-    continue;
-  }
-  if (ends[0].index < begins[0].index) {
-    violations.push({
-      file: file.relative,
-      line: lineOf(raw, ends[0].index),
-      message: `${END} appears before ${BEGIN}`,
-    });
-    continue;
-  }
-  sanctioned = { relative: file.relative, start: begins[0].index, end: ends[0].index };
 }
-
-if (!sanctioned && violations.length === 0) {
-  violations.push({
-    file: 'src/app/globals.css',
-    line: 1,
-    message: `the sanctioned local-tokens block markers (${BEGIN}/${END}) are missing — the exemption cannot be located, so nothing can be exempted`,
-  });
-}
-
-const inSanctioned = (relative, index) =>
-  sanctioned !== null &&
-  relative === sanctioned.relative &&
-  index >= sanctioned.start &&
-  index <= sanctioned.end;
 
 // ── the checks ─────────────────────────────────────────────────────────────
 
@@ -118,12 +82,11 @@ const CSS_DURATION = /(?:transition|animation)(?:-duration|-delay)?\s*:\s*[^;{}]
 const ARBITRARY = /(?:^|[\s"'`{(])(?:[a-z][a-zA-Z0-9-]*:)*[a-z][a-zA-Z0-9-]*-\[[^\]\s]+\]/g;
 const IMPORTANT = /!important/g;
 
-function scan(text, raw, relative, regex, message, { exemptInBlock }) {
+function scan(text, raw, relative, regex, message) {
   regex.lastIndex = 0;
   let match;
   while ((match = regex.exec(text)) !== null) {
     const index = match.index;
-    if (exemptInBlock && inSanctioned(relative, index)) continue;
     violations.push({
       file: relative,
       line: lineOf(raw, index),
@@ -139,30 +102,20 @@ for (const file of files) {
   const isCss = file.relative.endsWith('.css');
 
   if (isCss) {
-    scan(text, raw, file.relative, HEX_ANY, 'hardcoded hex colour', { exemptInBlock: false });
-    scan(text, raw, file.relative, CSS_FONT_SIZE_PX, 'px font-size', { exemptInBlock: true });
-    scan(text, raw, file.relative, CSS_DURATION, 'raw duration literal — use a `dur` token', {
-      exemptInBlock: true,
-    });
+    scan(text, raw, file.relative, HEX_ANY, 'hardcoded hex colour');
+    scan(text, raw, file.relative, CSS_FONT_SIZE_PX, 'px font-size');
+    scan(text, raw, file.relative, CSS_DURATION, 'raw duration literal — use a `dur` token');
   } else {
-    scan(text, raw, file.relative, HEX_TS_UNAMBIGUOUS, 'hardcoded hex colour', {
-      exemptInBlock: false,
-    });
+    scan(text, raw, file.relative, HEX_TS_UNAMBIGUOUS, 'hardcoded hex colour');
     // Same message as HEX_TS_UNAMBIGUOUS on purpose: the two patterns overlap on
     // 6- and 8-digit hexes, and the de-duplication below keys on the message, so
     // one hex reports once.
-    scan(text, raw, file.relative, HEX_TS_VALUE_POSITION, 'hardcoded hex colour', {
-      exemptInBlock: false,
-    });
-    scan(text, raw, file.relative, TS_FONT_SIZE_PX, 'px font-size in a style object', {
-      exemptInBlock: false,
-    });
+    scan(text, raw, file.relative, HEX_TS_VALUE_POSITION, 'hardcoded hex colour');
+    scan(text, raw, file.relative, TS_FONT_SIZE_PX, 'px font-size in a style object');
   }
 
-  scan(text, raw, file.relative, ARBITRARY, 'arbitrary Tailwind value (§1 row 17)', {
-    exemptInBlock: false,
-  });
-  scan(text, raw, file.relative, IMPORTANT, '!important (§1 row 17)', { exemptInBlock: false });
+  scan(text, raw, file.relative, ARBITRARY, 'arbitrary Tailwind value (§1 row 17)');
+  scan(text, raw, file.relative, IMPORTANT, '!important (§1 row 17)');
 }
 
 // De-duplicate: the two hex regexes overlap on 6- and 8-digit matches.
@@ -180,11 +133,10 @@ report({
   violations: unique,
   okMessage:
     `${files.length} file(s) clean — no hex, no px font-size, no arbitrary value, ` +
-    `no raw duration, no !important; one sanctioned local-tokens block in ` +
-    `${sanctioned?.relative ?? 'src/app/globals.css'} (${markerFiles} file(s) carry the markers)`,
+    'no raw duration, no !important, no local-tokens marker anywhere (the block is retired)',
   hint:
-    'If the value is token-shaped and packages/tokens cannot emit it yet, it belongs in the ONE\n' +
-    'local-tokens block in src/app/globals.css with its spec citation (D-010/D-012/D-017) —\n' +
-    'not at the call site, and never as a second block. A hex or an arbitrary Tailwind value\n' +
-    'is not eligible for that block: use the token.',
+    'Every token, breakpoint, container threshold and interaction constant now comes from\n' +
+    '@eutectic/tokens (D-021, M0-SH-13) — there is no local-tokens block to fall back into.\n' +
+    'If packages/tokens is genuinely missing a value, that is a shared-lane ticket, not a\n' +
+    'reopened marker pair or a raw literal here.',
 });
