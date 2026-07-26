@@ -13,7 +13,13 @@
     "lint": "echo \"lint: no rules configured yet (M0-SH-05)\"",
     "mock": "pnpm --filter @eutectic/contracts mock",
     "check:contract-freshness": "node scripts/check-contract-freshness.mjs",
+    "ci-gates": "node scripts/ci-gates.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:update": "EUTECTIC_WRITE_BASELINES=1 playwright test --update-snapshots",
     "test": "node scripts/check-font-budget.js && node scripts/check-contract-freshness.mjs && node --experimental-strip-types --test \"test/*.test.mjs\""
+  },
+  "engines": {
+    "node": ">=22.12"
   },
   "dependencies": {
     "@eutectic/contracts": "workspace:*",
@@ -25,10 +31,12 @@
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.0",
     "@storybook/nextjs": "^10.5.4",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "lighthouse": "^13.4.1",
     "storybook": "^10.5.4",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.6.3"

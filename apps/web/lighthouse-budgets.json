@@ -1,0 +1,64 @@
+{
+  "$comment": [
+    "M0-FE-10 — frontend-spec §19.6 ('Lighthouse budgets on / and /thread/[id]') and §14.",
+    "This is NOT Lighthouse's own budget.json format. Lighthouse 13 no longer accepts",
+    "--budget-path: it is silently ignored (configSettings.budgets comes back undefined and",
+    "no performance-budget/timing-budget audit is emitted), so a file in that shape would be",
+    "a budget nobody enforces. scripts/run-lighthouse.mjs reads this file and does the",
+    "enforcing itself against the LHR. Edit the numbers here, not in the script.",
+    "Every entry cites the spec line it comes from. `ratchet` marks a KNOWN BREACH: the",
+    "budget stays honest, the ratchet is where the number actually is today, the miss is",
+    "printed on every run, and the gate fails the moment it gets worse."
+  ],
+
+  "categories": {
+    "performance": { "min": 0.9, "why": "§14 is the real budget; this catches collapse" },
+    "accessibility": { "min": 1.0, "why": "§13 WCAG 2.2 AA — at 1.0 today, held there" },
+    "best-practices": { "min": 0.95, "why": "at 0.96 today" },
+    "seo": { "min": 1.0, "why": "at 1.0 today" }
+  },
+
+  "metrics": {
+    "largest-contentful-paint": {
+      "max": 1800,
+      "unit": "ms",
+      "why": "§14 LCP p75, 4G / mid-range Android ≤ 1.8s"
+    },
+    "cumulative-layout-shift": {
+      "max": 0.02,
+      "unit": "",
+      "why": "§14 CLS ≤ 0.02. The authoritative trace is e2e/cls.spec.ts (D-015 item 7); this is Lighthouse's simulated second opinion"
+    },
+    "total-blocking-time": {
+      "max": 200,
+      "unit": "ms",
+      "why": "lab proxy for §14 INP ≤ 150ms — Lighthouse has no lab INP"
+    }
+  },
+
+  "resources": {
+    "stylesheet": { "maxKiB": 30, "why": "§14 CSS total ≤ 30KB" },
+    "font": { "maxKiB": 100, "why": "§14 fonts total ≤ 100KB" },
+    "image": { "maxCount": 0, "why": "§14 'the feed loads zero images' — agent identity is a letter" },
+    "third-party": { "maxCount": 0, "why": "§14 no third-party anything" },
+    "total": { "maxCount": 12, "why": "§14 requests before first paint ≤ 12; total requests is the stricter proxy Lighthouse can actually report" }
+  },
+
+  "routes": [
+    {
+      "path": "/",
+      "status": "live",
+      "ratchets": {
+        "largest-contentful-paint": {
+          "value": 2300,
+          "note": "measured 2100-2217ms across four M0-FE-10 runs under Lighthouse's simulated slow-4G mobile preset. Observed breakdown is 45ms TTFB + 153ms render delay; the rest is the throttling model applied to 102KB of framework JS (D-019) and 65KB of preloaded fonts (§6.1). Nothing app-authored to cut yet — / renders a scaffold paragraph. Re-measure when the real feed lands (M1)."
+        }
+      }
+    },
+    {
+      "path": "/thread/[id]",
+      "status": "pending",
+      "note": "§19.6 names this route. It does not exist yet — M1. Reported as PENDING-ROUTE on every run, never as a pass."
+    }
+  ]
+}

@@ -25,7 +25,9 @@
     "next-env.d.ts",
     "next.config.ts",
     "src",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    "playwright.config.ts",
+    "e2e"
   ],
   "exclude": [
     "node_modules",

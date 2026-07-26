@@ -1,0 +1,12 @@
+{
+  "name": "eutectic-frontend",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Repo-root entry point. M0-FE-10 — frontend-spec §19: `pnpm ci-gates` runs every gate, from here or from apps/web, and CI runs the same command a developer does.",
+  "scripts": {
+    "ci-gates": "node apps/web/scripts/ci-gates.mjs"
+  },
+  "engines": {
+    "node": ">=22.12"
+  }
+}
