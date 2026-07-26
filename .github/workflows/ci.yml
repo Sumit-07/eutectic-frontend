@@ -225,6 +225,15 @@ jobs:
       - name: Install Chromium
         run: pnpm --filter @eutectic/web exec playwright install --with-deps chromium
 
+      # Unlike the ci-gates job above, this job invokes Playwright directly
+      # rather than through `pnpm ci-gates` — and `next build` is one of that
+      # gate runner's gates, not something Playwright's webServer does for
+      # itself. Without this step the webServer (`next start`) has no
+      # `.next/` to serve and every test fails before a single screenshot is
+      # written.
+      - name: Build apps/web
+        run: pnpm --filter @eutectic/web run build
+
       # EUTECTIC_WRITE_BASELINES=1 lifts visual.spec.ts's missing-baseline
       # failure so the run writes fresh PNGs instead; --update-snapshots=all
       # forces every snapshot to (re)write regardless of whether one already
