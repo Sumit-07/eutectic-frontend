@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
+import { cookies } from 'next/headers';
+
+import { resolveTheme, THEME_COOKIE, type Theme, type ThemeSetting } from '../../lib/theme';
 
 export const metadata: Metadata = {
   title: 'Token probe — Eutectic',
   description: 'Every surface, rule and ink token, rendered in both themes.',
 };
-
-type Theme = 'light' | 'dark';
 
 /*
  * Every class below comes from the `@theme inline` block that packages/tokens
@@ -170,7 +171,68 @@ function ThemePanel({ theme }: { theme: Theme }) {
   );
 }
 
-export default function ProbePage() {
+const THEME_OPTIONS: ReadonlyArray<{ value: ThemeSetting; label: string }> = [
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'system', label: 'System' },
+];
+
+/*
+ * M0-FE-09 — the theme toggle. Zero client JS: three submit buttons in one
+ * `<form>`, each carrying its own `name="theme"` / `value`, posting to
+ * `POST /theme` (src/app/theme/route.ts). That handler sets or clears the
+ * `theme` cookie and 303-redirects back to `returnTo` (hidden field below,
+ * `/probe`) — the redirected response already carries the new `data-theme`
+ * from `resolveTheme` (src/lib/theme.ts), so there is no flash and nothing to
+ * hydrate. `aria-current` marks the active choice for assistive tech; no
+ * script is involved anywhere on this page.
+ */
+function ThemeToggle({ resolved, setting }: { resolved: Theme; setting: ThemeSetting }) {
+  return (
+    <section className="border-t border-rule-strong p-8">
+      <h2>Theme — M0-FE-09</h2>
+      <p className="measure mt-3 text-ink-quiet">
+        This document resolved to <code>data-theme=&quot;{resolved}&quot;</code>. Current
+        setting: <code>{setting}</code>
+        {setting === 'system'
+          ? ' — no theme cookie set; following the Sec-CH-Prefers-Color-Scheme client hint, falling back to light.'
+          : ' — from the theme cookie.'}
+      </p>
+
+      <form method="post" action="/theme" className="mt-5 flex items-center gap-4">
+        <input type="hidden" name="returnTo" value="/probe" />
+        {THEME_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="submit"
+            name="theme"
+            value={option.value}
+            aria-current={setting === option.value ? 'true' : undefined}
+            className={`rounded-sm border px-6 py-4 font-ui text-label ${
+              setting === option.value
+                ? 'border-ink bg-ink text-paper'
+                : 'border-rule-strong bg-transparent text-ink hover:bg-paper-hover'
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </form>
+
+      <p className="measure mt-5 text-ink-quiet">
+        No user-customisable accent lives here or anywhere else (§16) — this
+        toggle is the whole of M0-FE-09&apos;s surface: two themes and an
+        explicit reset to OS preference, nothing more.
+      </p>
+    </section>
+  );
+}
+
+export default async function ProbePage() {
+  const cookieValue = (await cookies()).get(THEME_COOKIE)?.value;
+  const setting: ThemeSetting = cookieValue === 'light' || cookieValue === 'dark' ? cookieValue : 'system';
+  const resolved = await resolveTheme();
+
   return (
     <main>
       <div className="p-8">
@@ -190,6 +252,8 @@ export default function ProbePage() {
           utility below still comes from <code>packages/tokens</code> alone.
         </p>
       </div>
+
+      <ThemeToggle resolved={resolved} setting={setting} />
 
       <ThemePanel theme="light" />
       <ThemePanel theme="dark" />
