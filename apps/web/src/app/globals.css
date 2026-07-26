@@ -80,3 +80,78 @@
     outline-offset: var(--eu-space-1);
   }
 }
+
+/* ===========================================================================
+ * M0-FE-03 — the shell layer: frontend-spec §7.2 breakpoints and the §7.1
+ * column constants. This is the ONLY place in apps/web where either set of
+ * numbers is written; every shell reads them through the utilities below and
+ * no usage site ever restates a pixel value.
+ *
+ * Both sets belong in `packages/tokens` and are declared here only because
+ * that package does not emit them yet. This mirrors the D-010 ruling on
+ * `@utility z-*`/`dur-*` and the D-012 ruling on the local `measure` utility:
+ * a token-shaped value the shared package cannot yet express is declared once,
+ * locally, behind the same utility surface it will have when it moves — so the
+ * migration at the next tokens-touching shared ticket is a deletion here and a
+ * no-op at every call site. Delete this block then.
+ * ======================================================================== */
+
+@theme {
+  /*
+   * frontend-spec §7.2 — 480 / 780 / 1180. Tailwind's own scale
+   * (640/768/1024/1280/1536) is not this product's scale, and §7.2's names are
+   * literally `xs`/`sm`/`md`/`lg`, so the defaults are cleared rather than
+   * shadowed: an off-spec `xl:`/`2xl:` variant must not silently compile.
+   *
+   *   xs  <480      no variant — the base declaration is xs (§7.2 tightenings)
+   *   sm  480–779   `sm:`  … and `max-md:` for "below md"
+   *   md  780–1179  `md:`
+   *   lg  ≥1180     `lg:`
+   *
+   * Declaring them as theme breakpoints rather than hand-written @media blocks
+   * is what keeps CLAUDE.md rule 2 satisfiable: shells get `md:`/`lg:` variants
+   * with no arbitrary bracket value anywhere and no px literal outside this
+   * block. Media queries are for shells only (§7.2) — components use container
+   * queries.
+   */
+  --breakpoint-*: initial;
+  --breakpoint-sm: 480px;
+  --breakpoint-md: 780px;
+  --breakpoint-lg: 1180px;
+}
+
+@layer tokens {
+  :root {
+    /*
+     * frontend-spec §7.1 — the normative shell column widths. Spec constants,
+     * not magic numbers: 236 / 300 are the feed rails, 720 is the feed centre
+     * cap and the reading column, 640 is the private column.
+     */
+    --eu-shell-rail-start: 236px;
+    --eu-shell-rail-end: 300px;
+    --eu-shell-column: 720px;
+    --eu-shell-column-private: 640px;
+  }
+}
+
+/* §7.1 feed grid, three columns: `236px / minmax(0,1fr) / 300px`. Tailwind has
+   no theme namespace for explicit grid tracks, so this is the D-010 @utility
+   shape rather than an arbitrary `grid-cols-[…]` (§1 row 17). */
+@utility shell-grid-3 {
+  grid-template-columns: var(--eu-shell-rail-start) minmax(0, 1fr) var(--eu-shell-rail-end);
+}
+
+/* §7.2 md — the right rail is gone; the two remaining tracks keep their widths
+   so the centre column does not jump when the rail drops. */
+@utility shell-grid-2 {
+  grid-template-columns: var(--eu-shell-rail-start) minmax(0, 1fr);
+}
+
+/* Logical, like the `measure` utility these sit beside in packages/tokens. */
+@utility shell-column {
+  max-inline-size: var(--eu-shell-column);
+}
+
+@utility shell-column-private {
+  max-inline-size: var(--eu-shell-column-private);
+}
