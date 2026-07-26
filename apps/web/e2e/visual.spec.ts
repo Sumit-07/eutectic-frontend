@@ -17,10 +17,41 @@
 //   which is not this repo's to pin.
 //
 // Baselines are per-platform (Playwright suffixes them `-darwin`/`-linux`).
-// A run on a platform with no committed baseline SKIPS with an annotation
-// rather than writing a new baseline and calling it a pass — a screenshot test
-// that generates its own expectation is not a test. The skip is visible in the
-// reporter and in the ci-gates summary; it is never silent.
+//
+// ── M0-FE-14 — the Linux skip path is RETIRED, not the check ───────────────
+// Until M0-FE-14, a run on a platform with no committed baseline SKIPPED with
+// an annotation rather than writing a new baseline and calling it a pass — a
+// screenshot test that generates its own expectation is not a test. That was
+// right for a Linux baseline that could not yet be produced (CI had never
+// executed a single gate on Linux, D-009). Real CI landed with this ticket, so
+// the six `*-chromium-linux.png` baselines now exist and are committed
+// alongside the `-darwin` set; a MISSING Linux baseline from here on means
+// something is wrong (a new snapshot call with no baseline generated for it,
+// or a baseline that was never committed) and is a hard FAILURE, not a skip.
+// The failure message names the fix: dispatch the `regenerate-baselines` job
+// in .github/workflows/ci.yml (the only sanctioned way to produce a
+// `-linux` baseline from a macOS dev machine — Playwright can only write the
+// platform it runs on), download the artifact, eyeball every PNG, commit.
+// `EUTECTIC_WRITE_BASELINES=1` still lifts this locally, for exactly that flow
+// and nothing else — it is not a way to make CI pass, because CI never sets it
+// outside the dedicated job above.
+//
+// ── D-024 item 4 — a known limit of this gate, restated where it lives ─────
+// This is a pixel-diff gate, not a human eye: `maxDiffPixelRatio` is 0.002
+// (playwright.config.ts), so a REAL visual change under that ratio passes
+// SILENTLY — no failure, no notice, nothing in the ci-gates summary. And
+// `--update-snapshots` in its default "changed" mode only rewrites a baseline
+// that already FAILED the comparison, so a passing-but-sub-threshold-changed
+// baseline is never refreshed by the everyday flow either. FE-13 shipped a
+// real ~0.0014 change that slipped exactly this way until an explicit
+// before/after diff caught it. Protocol, standing: a PR that *intends* a
+// visual change force-regenerates every baseline with
+// `EUTECTIC_WRITE_BASELINES=1 pnpm --filter @eutectic/web exec playwright test
+// --update-snapshots=all`, and review confines the old-vs-new diff to the
+// intended region — a green run alone is never proof of pixel-identity for a
+// sub-threshold change. "Changed" mode (`pnpm test:e2e:update`) stays the
+// default for everyday runs; `=all` is only for a PR that means to move a
+// baseline.
 
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -48,17 +79,22 @@ for (const { route, name } of PAGES) {
       );
       const missing = !existsSync(baseline) && !process.env.EUTECTIC_WRITE_BASELINES;
       const reason =
-        `PENDING-BASELINE: no committed baseline for ${process.platform} at ${path.relative(here, baseline)}. ` +
-        'Generate with `pnpm test:e2e:update`, review the PNG by eye, and commit it.';
+        `MISSING-LINUX-BASELINE: no committed baseline for ${process.platform} at ` +
+        `${path.relative(here, baseline)}. The skip path retired at M0-FE-14 — dispatch the ` +
+        '`regenerate-baselines` job in .github/workflows/ci.yml, download the `linux-baselines` ' +
+        'artifact, review every PNG by eye, and commit it.';
+      // Thrown, not skipped (M0-FE-14). A skip prints a dash in the list reporter
+      // and swallows the reason, so a suite that quietly skips every case looks
+      // exactly like a suite that passed — that was fine while Linux CI genuinely
+      // did not exist yet (D-009), and is not fine now that it does. This is
+      // deliberately NOT the retired `PENDING-BASELINE` sentinel that
+      // scripts/ci-gates.mjs's NOT_YET_SATISFIED regex scrapes for a graceful
+      // not-yet-satisfied notice: a missing Linux baseline is a hard failure, and
+      // Playwright's own failure reporting (which ci-gates.mjs already treats as
+      // a gate failure) is what surfaces it — no separate scrape needed.
       if (missing) {
-        // Printed, not just annotated. Playwright's list reporter shows a skipped
-        // test as a dash and swallows the reason, so a suite that quietly skips
-        // every case looks exactly like a suite that passed. scripts/ci-gates.mjs
-        // scrapes stdout for PENDING-BASELINE and reprints it in the
-        // NOT-YET-SATISFIED block — it can only do that if the line is on stdout.
-        console.log(`  ${reason}`);
+        throw new Error(reason);
       }
-      test.skip(missing, reason);
 
       // The theme is a server-side cookie (D-018 / M0-FE-09), so it is set
       // before the first paint rather than toggled after it — which is also
