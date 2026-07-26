@@ -3,3 +3,9 @@
 .next/
 next-env.d.ts
 *.tsbuildinfo
+
+# M0-FE-07 — Storybook is dev-only tooling; its built catalogue and caches
+# never ship and never enter the app bundle.
+storybook-static/
+.storybook-out/
+*.storybook.log
