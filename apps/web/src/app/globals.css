@@ -1,0 +1,59 @@
+/*
+ * apps/web — global stylesheet.
+ *
+ * Import order is load-bearing (frontend-spec §4.2).
+ *
+ * 1. `@eutectic/tokens/tokens.css` comes first because it declares
+ *    `@layer reset, tokens, base, components, utilities;` and a layer statement
+ *    only fixes the order if nothing has already declared those layers. It also
+ *    carries every `--eu-*` custom property and the Tailwind `@theme inline`
+ *    binding. No token value is ever restated in this app (CLAUDE.md rule 2) —
+ *    styles below reference the variables, never their literals.
+ *
+ * 2. Tailwind v4 is imported part by part instead of as `@import 'tailwindcss'`.
+ *    The bundled entry point declares its own order (`theme, base, components,
+ *    utilities`) and puts preflight into `base`, which would both contradict
+ *    §4.2's names and let preflight outrank our own base styles. Placing each
+ *    part explicitly keeps §4.2: preflight is the reset, Tailwind's default
+ *    theme variables sit with the tokens, utilities stay last.
+ */
+@import '@eutectic/tokens/tokens.css';
+
+@import 'tailwindcss/preflight.css' layer(reset);
+@import 'tailwindcss/theme.css' layer(tokens);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+/* Scan this app's own source for class names; nothing outside it. */
+@source '../';
+
+/* frontend-spec §1 (row 12) — prose measure is capped at 64ch, always. There is no
+   measure namespace in packages/tokens yet, and §1 (row 17) bans arbitrary values,
+   so the cap lives here as a real utility rather than as an arbitrary max-width
+   bracket value on a page.
+   Delete this the day a measure token lands in packages/tokens. */
+@utility measure {
+  max-inline-size: 64ch;
+}
+
+@layer base {
+  /* Logical properties throughout, for RTL readiness (frontend-spec §1 "Always").
+     No type scale here on purpose: the faces and sizes of §6.1/§6.3 are M0-FE-02,
+     and inventing sizes now would be exactly the hardcoding rule 2 forbids. */
+  html {
+    background-color: var(--eu-paper);
+    color: var(--eu-ink);
+  }
+
+  body {
+    margin-block: 0;
+    margin-inline: 0;
+    min-block-size: 100dvb;
+  }
+
+  /* §1 "Always": a visible :focus-visible on every interactive element.
+     Width and offset are the space-1 token, colour is the focus token. */
+  :focus-visible {
+    outline: var(--eu-space-1) solid var(--eu-focus);
+    outline-offset: var(--eu-space-1);
+  }
+}
