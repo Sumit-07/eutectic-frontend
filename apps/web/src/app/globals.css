@@ -155,3 +155,102 @@
 @utility shell-column-private {
   max-inline-size: var(--eu-shell-column-private);
 }
+
+/* ---------------------------------------------------------------------------
+ * M0-FE-05 — the same block, extended. Not a second local-tokens site: these
+ * are the remaining spec literals the five §9.1 interactive primitives need
+ * that `packages/tokens` does not emit yet, declared here once, beside the
+ * §7.1/§7.2 constants above, under the identical D-010/D-012 reasoning and
+ * the identical deletion contract — when the consolidation ticket moves the
+ * block into `packages/tokens`, these move with it and every call site is a
+ * no-op. Ruled by CTO-Frontend on this ticket: one block, never scattered at
+ * usage sites. Each value carries the spec line it comes from.
+ * ------------------------------------------------------------------------ */
+
+@theme {
+  /*
+   * frontend-spec §7.2 sm = 480. §7.2 also says components use container
+   * queries and only shells use media queries, so this 480 is deliberately
+   * NOT the `--breakpoint-sm` above: it is the same number measured against
+   * the component's own column instead of the viewport. Tailwind derives its
+   * `@<name>:` container-query variants from the `--container-*` namespace,
+   * so this key is what makes `@eu-sm:` readable as "my column is at least
+   * §7.2's sm wide" — which is exactly what §9.1's `Meter` row switches on.
+   * Prefixed `eu-` rather than overriding `--container-sm`, because Tailwind's
+   * default container scale also backs `max-w-*`, which existing fixtures read.
+   */
+  --container-eu-sm: 480px;
+
+  /*
+   * frontend-spec §11 — "Skeleton | 1.4s linear shimmer, static under
+   * reduced-motion". 1.4s cannot borrow a §5.4 `dur` token: those cap at
+   * 280ms because they time interaction feedback, and this is an idle loop.
+   * The cycle is opacity only — a sweeping gradient is the conventional
+   * shimmer, and CLAUDE.md §4 bans gradients outright, so the surface stays
+   * flat `paper-sink` and only its opacity moves. `linear` per §11; `static
+   * under reduced-motion` is the caller's `motion-safe:` variant, so the
+   * animation is simply never applied rather than applied and then frozen.
+   */
+  --animate-shimmer: eu-shimmer var(--eu-shimmer-duration) linear infinite;
+
+  @keyframes eu-shimmer {
+    /* Trough is an animation depth, not a surface value — there is no token
+       shaped like it, and it is written once, here. */
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+}
+
+@layer tokens {
+  :root {
+    /* frontend-spec §11 — "Skeleton | 1.4s linear shimmer". */
+    --eu-shimmer-duration: 1.4s;
+
+    /* frontend-spec §11 — "Sheet | … backdrop → `rgb(22 23 26/.32)`", verbatim.
+       Deliberately an absolute value and not `color-mix(… var(--eu-ink) …)`:
+       `ink` inverts with the theme, and a dialog backdrop that turns pale in
+       dark mode is not what §11 specifies. */
+    --eu-sheet-backdrop: rgb(22 23 26/.32);
+
+    /* frontend-spec §9.1 — "`Tooltip` | `content`, `delay=400`". */
+    --eu-tooltip-delay: 400ms;
+
+    /* frontend-spec §13 — "Touch targets ≥ 44×44 on `sm`/`xs` and on native,
+       including `Meter`". The §5.4 space scale steps 40 → 56 around it, so
+       44 cannot be composed from tokens without arithmetic at a call site. */
+    --eu-touch-target: 44px;
+  }
+}
+
+/* §11's sheet backdrop, reachable through Tailwind's `backdrop:` variant so
+   the value stays here and the component only names it. */
+@utility sheet-backdrop {
+  background-color: var(--eu-sheet-backdrop);
+}
+
+/* §9.1's 400ms tooltip delay. Applied on the reveal state only — the base
+   state keeps a 0 delay, so a tooltip waits 400ms to appear and disappears the
+   moment the pointer or focus leaves. Tailwind's `delay-*` scale is its own
+   default numbers, not this product's, so it is not used. */
+@utility delay-tooltip {
+  transition-delay: var(--eu-tooltip-delay);
+}
+
+/* §13's 44×44 minimum, logical so it survives a writing-mode change. */
+@utility touch-target {
+  min-inline-size: var(--eu-touch-target);
+  min-block-size: var(--eu-touch-target);
+}
+
+/* One line box of whatever type scale is in effect. Not a token — `lh` is a
+   CSS unit Tailwind has no namespace for — but it is what makes a `Skeleton`
+   exactly as tall as the text it stands in for, which is the §14 CLS ≤ 0.02
+   budget's only defence. Same D-010 @utility shape as `z-*`/`dur-*`. */
+@utility block-lh {
+  block-size: 1lh;
+}
