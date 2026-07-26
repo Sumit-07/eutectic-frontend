@@ -18,28 +18,21 @@ import type { AgentInkName } from '@eutectic/core';
  *
  * Every row maps to a token utility: `inline-9`/`inline-10` are space-9 (40) and
  * space-10 (56); `text-head`/`text-title` are the §6.3 22 and 27 steps;
- * `text-micro` is 10.5; `mbs-3` is space-3; `pbs-1` is space-1. No literal
+ * `text-micro` is 10.5; `mbs-3` is space-3; `pbs-1` is space-1;
+ * `leading-initial` is §7.4's `.85`, the one line-height below 1 in the
+ * product (D-021, `packages/tokens` `--eu-leading-initial`). No literal
  * appears in this file (CLAUDE.md rule 2), and every size utility is logical
  * (`inline-size`, `margin-block-start`, `border-block-start`) per §1 "Always".
  *
- * TWO SPEC VALUES THIS FILE CANNOT EXPRESS — reported, not invented:
- *
- * 1. `initial … lineHeight .85`. `packages/tokens` emits no `--leading-*`
- *    value below 1, and D-017 forecloses a second local-tokens block in
- *    apps/web, so the nearest existing token utility — `leading-none` (1) — is
- *    used here and the missing token is reported to Fable. The visible effect
- *    is ~4px of extra box height under the initial at the 27px step; the
- *    optical cap-height alignment §1 "Always" asks for lands exactly when a
- *    `leading-initial` (.85) token ships and this one class changes.
- * 2. The xs step (§7.2, <480) is applied with the app's `sm:` breakpoint
- *    variant (the §7.2 480px threshold, declared once in globals.css) rather
- *    than a container query, because Tailwind's container-query variants read
- *    the `--container-*` namespace and no token in that namespace sits at 480.
- *    Base styles are therefore the xs values and `sm:` restores the full-size
- *    ones. §7.2 makes this threshold a shell-level breakpoint ("media queries
- *    only for shells") so it is legal where a component-internal query would
- *    be preferable; when a 480px container token lands, `sm:` becomes `@min-…`
- *    at these two call sites and nothing else moves.
+ * THE xs STEP IS A CONTAINER QUERY, NOT A MEDIA QUERY. §7.2: "components use
+ * container queries, only shells use media queries." `@eu-sm:` reads
+ * `--container-eu-sm` (480px, D-021) against the nearest ancestor `@container`
+ * — `EntryShell` declares one on every entry (§9.2), exactly as `Meter` reads
+ * the same threshold for its own ≥sm label switch (§9.1). Base styles are
+ * therefore the xs values (40px gutter, 22px initial) and `@eu-sm:` restores
+ * the full-size ones (56px, 27px) once the entry's own column — not the
+ * viewport — crosses 480px. A `Gutter` rendered with no `@container` ancestor
+ * simply stays in its xs form, which is the safe direction to fail.
  *
  * The initial is `aria-hidden`: §17 makes it the avatar ("agent identity is a
  * letter, never an avatar image"), and the same identity is already carried in
@@ -114,10 +107,10 @@ export type GutterProps = {
 
 export function Gutter({ initial, ink, age, calibration }: GutterProps) {
   return (
-    <div className="flex inline-9 flex-none flex-col gap-1 sm:inline-10">
+    <div className="flex inline-9 flex-none flex-col gap-1 @eu-sm:inline-10">
       <span
         aria-hidden="true"
-        className={`font-prose text-head leading-none sm:text-title ${AGENT_INK_TEXT_CLASSES[ink]}`}
+        className={`font-prose text-head leading-initial @eu-sm:text-title ${AGENT_INK_TEXT_CLASSES[ink]}`}
       >
         {initial}
       </span>
