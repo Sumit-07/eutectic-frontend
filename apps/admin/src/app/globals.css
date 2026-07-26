@@ -1,0 +1,71 @@
+/*
+ * apps/admin — global stylesheet.
+ *
+ * M0-FE-12 — mirrors apps/web's globals.css (frontend-spec §4.2) import
+ * mechanism exactly: `@eutectic/tokens/tokens.css` first (it declares the
+ * `@layer reset, tokens, base, components, utilities;` order and every
+ * `--eu-*` custom property + the Tailwind `@theme inline` binding), then
+ * Tailwind's three parts placed explicitly into those layers so preflight
+ * lands in `reset` and Tailwind's own theme variables land in `tokens`,
+ * never restating a token value (CLAUDE.md rule 2).
+ *
+ * Deliberately NOT mirrored: the local-tokens block apps/web carries below
+ * its own equivalent of this comment (shell grid columns, breakpoints,
+ * skeleton shimmer, sheet backdrop, tooltip delay, touch target). D-017
+ * forecloses a second local-tokens block, and none of that debt is needed by
+ * this ticket's nav + eight empty-state stubs. If a future admin ticket
+ * believes it needs a local value here, that is a STOP-and-report per this
+ * ticket's brief, not a new block.
+ */
+@import '@eutectic/tokens/tokens.css';
+
+@import 'tailwindcss/preflight.css' layer(reset);
+@import 'tailwindcss/theme.css' layer(tokens);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+/* Scan this app's own source for class names; nothing outside it. */
+@source '../';
+
+@layer base {
+  /*
+   * next/font/local (src/fonts/index.ts) generates a hashed, unpredictable
+   * family name per build for each of the three faces, so the literal
+   * 'Newsreader' / 'Instrument Sans' / 'Commit Mono' strings baked into
+   * `packages/tokens`' --eu-font-prose/ui/mono can never match what actually
+   * loaded. This is the one place that seam is bridged: the three
+   * --font-*-loaded variables next/font attaches to <html> (root layout)
+   * override the three --eu-font-* custom properties here, once. Every
+   * downstream consumer — Tailwind's font-prose/ui/mono utilities, anything
+   * else reading --eu-font-* — keeps reading tokens and needs no knowledge
+   * that next/font is involved. Nothing else in apps/admin restates a family
+   * stack.
+   */
+  :root {
+    --eu-font-prose: var(--font-prose-loaded);
+    --eu-font-ui: var(--font-ui-loaded);
+    --eu-font-mono: var(--font-mono-loaded);
+  }
+
+  /* Logical properties throughout, for RTL readiness (frontend-spec §1
+     "Always"). No type scale set here: §6.3's text-display…text-micro
+     utilities come from packages/tokens' @theme and are applied per-element,
+     not as a base default — setting one here would be exactly the
+     hardcoding rule 2 forbids. */
+  html {
+    background-color: var(--eu-paper);
+    color: var(--eu-ink);
+  }
+
+  body {
+    margin-block: 0;
+    margin-inline: 0;
+    min-block-size: 100dvb;
+  }
+
+  /* §1 "Always": a visible :focus-visible on every interactive element.
+     Width and offset are the space-1 token, colour is the focus token. */
+  :focus-visible {
+    outline: var(--eu-space-1) solid var(--eu-focus);
+    outline-offset: var(--eu-space-1);
+  }
+}

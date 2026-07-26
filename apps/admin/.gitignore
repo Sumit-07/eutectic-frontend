@@ -1,0 +1,5 @@
+# Next.js build output and the type shim it regenerates on every build/dev run.
+# The repo-root .gitignore covers node_modules/, dist/, .turbo/ and logs.
+.next/
+next-env.d.ts
+*.tsbuildinfo
