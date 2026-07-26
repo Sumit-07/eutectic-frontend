@@ -1,26 +1,80 @@
-# Placeholder CI — decorative until GitHub remotes exist (D-006).
-# Runs typecheck across this repo's packages once it is part of the
-# eutectic pnpm workspace (workspace root: pnpm-workspace.yaml, tsconfig.base.json,
-# turbo.json — see operating-model.md §3, D-004). Local equivalent today:
-#   pnpm install && pnpm -r typecheck   (run from the workspace root)
+# CI — frontend-spec §19. M0-FE-10.
+#
+# §19 opens "A PR fails on any of these" and lists ten gates. All ten live behind
+# one command, `pnpm ci-gates`, defined in this repo's root package.json and in
+# apps/web/package.json. This workflow's whole job is to check the code out on the
+# right Node and run that command: CI runs exactly what a developer runs, so a
+# gate can never pass locally and fail here for a reason nobody can reproduce.
+#
+# STILL GATED ON workflow_dispatch, and that is deliberate (D-009): this repo is a
+# child of a pnpm workspace whose root — pnpm-workspace.yaml, the lockfile,
+# tsconfig.base.json, turbo.json — lives one level up and is not checked out here.
+# `pnpm install` cannot resolve `workspace:*` deps from a lone child clone, so the
+# install step below cannot succeed on GitHub yet no matter how correct the rest
+# is. M0-SH-05 owns the fix (multi-repo checkout or a workspace-root action).
+# Flipping the trigger to `pull_request` is a one-line change once it lands, and
+# the rest of this file is written to be correct on that day rather than rewritten
+# on it. Until then the gates are enforced by running `pnpm ci-gates` locally
+# before review; every M0-FE-10 gate has been proven red and green that way.
 name: CI
 
 on:
-  # Gated until M0-SH-05 builds real per-repo CI (child repo alone lacks the
-  # workspace root, so this job cannot pass on GitHub yet - see D-009).
   workflow_dispatch:
+  # M0-SH-05 — uncomment once a child clone can install (D-009):
+  # pull_request:
+  #   branches: [develop, main]
+  # push:
+  #   branches: [develop]
 
 jobs:
-  typecheck:
+  ci-gates:
+    name: frontend-spec §19 gates
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.9
+
+      # D-019 — the floor is 22.12, not 22.9: Next 15.5 requires it and every §14
+      # budget was measured on it. apps/web/package.json `engines` says the same
+      # thing, and scripts/ci-gates.mjs refuses to run below it rather than
+      # producing numbers that do not describe what ships.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.9.0
+          node-version: 22.12.0
           cache: pnpm
+
       - run: pnpm install --frozen-lockfile
-      - run: pnpm -r typecheck
+
+      # Playwright (§19.7) and Lighthouse (§19.6) both drive this browser. One
+      # download, one version, so the CLS trace and the Lighthouse run measure the
+      # same engine. --with-deps installs the shared libraries the runner lacks.
+      - name: Install Chromium
+        run: pnpm --filter @eutectic/web exec playwright install --with-deps chromium
+
+      - run: pnpm ci-gates
+
+      # Screenshot diffs and traces are only worth anything when something failed.
+      - name: Upload Playwright artefacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            apps/web/test-results/
+            apps/web/playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-reports
+          path: apps/web/.next/lighthouse/
+          retention-days: 7
+          if-no-files-found: ignore

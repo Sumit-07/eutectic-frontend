@@ -82,6 +82,23 @@
 }
 
 /* ===========================================================================
+ * eutectic:local-tokens:begin
+ *
+ * THE sanctioned local-tokens block — the only one, ever (D-017). Everything
+ * from this marker down to the closing marker at the bottom of this file is the
+ * single place in apps/web where a spec literal `packages/tokens` does not emit
+ * yet may be written down. `scripts/check-token-lint.mjs` exempts exactly this
+ * range, exempts nothing else anywhere, and fails if a second pair of these
+ * markers ever appears in the app.
+ *
+ * The exemption is narrow and deliberate. Inside the block, raw dimension and
+ * duration literals (`480px`, `1.4s`, `400ms`) and an absolute `rgb()` are
+ * permitted, because hosting exactly those is the block's reason to exist.
+ * A hardcoded hex colour and an arbitrary Tailwind value (`text-[13px]`) are
+ * NOT permitted here either — they are banned everywhere in the app, block
+ * included, because neither is a token-shaped value waiting for a home.
+ * Every literal below carries the frontend-spec line it comes from.
+ *
  * M0-FE-03 — the shell layer: frontend-spec §7.2 breakpoints and the §7.1
  * column constants. This is the ONLY place in apps/web where either set of
  * numbers is written; every shell reads them through the utilities below and
@@ -254,3 +271,6 @@
 @utility block-lh {
   block-size: 1lh;
 }
+
+/* eutectic:local-tokens:end — nothing token-shaped may be written below this
+   line, and no second block may be opened above it. */

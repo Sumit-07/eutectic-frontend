@@ -9,3 +9,11 @@ next-env.d.ts
 storybook-static/
 .storybook-out/
 *.storybook.log
+
+# M0-FE-10 — Playwright run artefacts (traces, diffs, actual-vs-expected PNGs,
+# the HTML reporter). The BASELINE screenshots under
+# e2e/*.spec.ts-snapshots/ are the opposite of this: they are the expectation,
+# they are reviewed by eye, and they are committed.
+test-results/
+playwright-report/
+blob-report/
