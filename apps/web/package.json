@@ -9,10 +9,15 @@
     "start": "next start",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "echo \"lint: no rules configured yet (M0-SH-05)\"",
-    "test": "node scripts/check-font-budget.js"
+    "mock": "pnpm --filter @eutectic/contracts mock",
+    "check:contract-freshness": "node scripts/check-contract-freshness.mjs",
+    "test": "node scripts/check-font-budget.js && node scripts/check-contract-freshness.mjs && node --experimental-strip-types --test \"test/*.test.mjs\""
   },
   "dependencies": {
+    "@eutectic/contracts": "workspace:*",
+    "@eutectic/core": "workspace:*",
     "@eutectic/tokens": "workspace:*",
+    "@tanstack/react-query": "^5.101.4",
     "next": "^15.5.22",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
