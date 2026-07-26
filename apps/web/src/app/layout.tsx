@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { cookies, headers } from 'next/headers';
 
+import { mono, prose, ui } from '../fonts';
+
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -50,7 +52,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const theme = await resolveTheme();
 
   return (
-    <html lang="en" data-theme={theme}>
+    <html
+      lang="en"
+      data-theme={theme}
+      className={`${prose.variable} ${ui.variable} ${mono.variable}`}
+    >
       <body className="bg-paper text-ink">{children}</body>
     </html>
   );

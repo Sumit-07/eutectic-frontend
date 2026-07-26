@@ -9,7 +9,7 @@
     "start": "next start",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "echo \"lint: no rules configured yet (M0-SH-05)\"",
-    "test": "echo \"test: no tests yet (M0-FE-07)\""
+    "test": "node scripts/check-font-budget.js"
   },
   "dependencies": {
     "@eutectic/tokens": "workspace:*",
