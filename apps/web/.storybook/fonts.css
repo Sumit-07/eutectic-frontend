@@ -1,0 +1,56 @@
+/*
+ * M0-FE-07 — font wiring for Storybook.
+ *
+ * The app never loads fonts this way: `src/fonts/index.ts` uses
+ * `next/font/local`, which hashes a family name per build and attaches it to
+ * `<html>` via a generated CSS-module class (`prose.variable` etc., wired to
+ * `--font-*-loaded` in `globals.css`). Storybook does not render the RSC root
+ * layout — there is no `<html>` for that class to land on — so reproducing
+ * the SAME hashed-class mechanism here would mean re-deriving next/font's
+ * internal output, which is not this ticket's job.
+ *
+ * Instead: the same three source files, loaded with a plain `@font-face` and
+ * bound directly to the three `--font-*-loaded` custom properties that
+ * `globals.css` already reads (`--eu-font-prose: var(--font-prose-loaded)`,
+ * etc.) — same files, same weight range (400–600, per §6.3's weight policy —
+ * the fonts were already subset to this range at build time, M0-FE-02), same
+ * fallback stacks as `src/fonts/index.ts`. Every story therefore renders in
+ * the real product typefaces, not a system-font stand-in.
+ *
+ * This file is imported once, in `.storybook/preview.tsx`, before
+ * `globals.css`'s own imports — order does not matter for these two specific
+ * custom properties (this file only ever WRITES `--font-*-loaded`;
+ * `globals.css` only ever READS it into `--eu-font-*`), but importing it
+ * first keeps the dependency direction obvious to a reader.
+ */
+
+@font-face {
+  font-family: 'Storybook Newsreader';
+  src: url('../src/fonts/newsreader/Newsreader-Variable.woff2') format('woff2');
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Storybook Instrument Sans';
+  src: url('../src/fonts/instrument-sans/InstrumentSans-Variable.woff2') format('woff2');
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Storybook Commit Mono';
+  src: url('../src/fonts/commit-mono/CommitMono-Variable.woff2') format('woff2');
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* Matches `fallback` in src/fonts/index.ts, per face. */
+  --font-prose-loaded: 'Storybook Newsreader', Georgia, 'Iowan Old Style', serif;
+  --font-ui-loaded: 'Storybook Instrument Sans', system-ui, sans-serif;
+  --font-mono-loaded: 'Storybook Commit Mono', ui-monospace, 'IBM Plex Mono', monospace;
+}
