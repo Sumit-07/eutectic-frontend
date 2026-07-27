@@ -64,13 +64,50 @@ const ROUTES = ['/probe', '/', '/probe/entry'];
  * fails the moment it gets worse. Fixing it means touching §6.1/§14 font
  * strategy (fallback metrics, the two-preload rule) or the probe copy — both
  * outside M0-FE-10, both reported to CTO-Frontend in the PR body.
+ *
+ * RE-BASELINED FOR LINUX — D-026, M0-FE-14. Same tracked defect, a different
+ * platform to measure it on: CI runs on ubuntu-latest now (D-009 — no gate had
+ * ever executed there before this ticket), and Linux has no Georgia/Iowan Old
+ * Style, so fontconfig substitutes DejaVu/Liberation metrics for the fallback
+ * face — a bigger swap, a bigger reflow. Four runs on four VMs measured the
+ * same deterministic float, 0.04938935279846191, with the document painting in
+ * the fallback face every time; a fifth measured 0, the font winning the race
+ * instead. Not noise: bimodal and reproducible.
+ *
+ * D-026's ruling: a ratchet is a measurement, and a measurement is tied to the
+ * platform it was taken on. 0.026 described a platform (macOS) CI no longer
+ * runs on, so it re-baselines to an honest Linux measurement rather than being
+ * loosened as a waiver — "may only tighten" (D-020) now resumes per-platform
+ * from 0.05. Accepted residuals, recorded, not hidden: headroom above the
+ * deterministic value is ~0.0006 (tight is good), and the one-in-five lucky-0
+ * runs mean a real regression could in principle hide behind a lucky race — a
+ * bimodality that exists at any threshold and is only eliminated by the actual
+ * fix below, not by moving this number.
+ *
+ * The real fix is human-gated and scheduled, not just noted: eliminating the
+ * swap reflow (`display: 'optional'` vs tuned size-adjusted fallbacks) is a
+ * §6.1 product-behavior/taste call, joining the existing font-strategy item
+ * (D-020: kerning + CLS, ONE item) on the human's list. Whichever ticket
+ * implements the chosen strategy MUST tighten this ratchet to <= 0.005 in the
+ * SAME PR — that is what converts this tracked breach into scheduled work with
+ * a measurable exit, and it is the one condition under which this number is
+ * allowed to move again.
  */
 const OVER_BUDGET: Record<string, { ratchet: number; note: string }> = {
   '/probe': {
-    ratchet: 0.026,
+    ratchet: 0.05,
     note:
-      'webfont swap reflow, measured 0.0247 by M0-FE-10 — over §14, tracked with CTO-Frontend, ' +
-      'ratcheted here so it can only get better',
+      'webfont swap reflow, measured 0.0247 on macOS by M0-FE-10, re-baselined to the Linux ' +
+      'measurement by D-026 (M0-FE-14): CI now runs on ubuntu-latest, where the same defect ' +
+      'measures a deterministic 0.04938935279846191 (four runs, four VMs, byte-identical; a ' +
+      'fifth measured 0 — bimodal, not noise) because Linux has no Georgia/Iowan Old Style and ' +
+      'fontconfig substitutes DejaVu/Liberation metrics for the fallback face. A ratchet is a ' +
+      'measurement tied to the platform it was taken on — when the platform changed the number ' +
+      'was re-baselined honestly, not loosened as a waiver, and "only tighten" resumes from ' +
+      'here per-platform. Residuals accepted in D-026: ~0.0006 headroom, one-in-five lucky-0 ' +
+      "bimodality. The real fix (display:'optional' vs tuned size-adjusted fallbacks) is " +
+      '§6.1 human-gated taste, joins the D-020 font-strategy item, and MUST tighten this ' +
+      'ratchet to <= 0.005 in the same PR that ships it',
   },
 };
 
