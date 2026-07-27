@@ -1,30 +1,84 @@
-# CI — frontend-spec §19. M0-FE-10.
+# CI — frontend-spec §19. M0-FE-10, real CI landed by M0-FE-14 (D-022, D-024).
 #
-# §19 opens "A PR fails on any of these" and lists ten gates. All ten live behind
-# one command, `pnpm ci-gates`, defined in this repo's root package.json and in
-# apps/web/package.json. This workflow's whole job is to check the code out on the
-# right Node and run that command: CI runs exactly what a developer runs, so a
-# gate can never pass locally and fail here for a reason nobody can reproduce.
+# §19 opens "A PR fails on any of these" and lists ten gates (an eleventh,
+# `playwright`, is folded in as the CLS trace + visual regression check
+# alongside them). All eleven live behind one command, `pnpm ci-gates`,
+# defined in eutectic-frontend's root package.json and in apps/web/package.json.
+# This workflow's whole job is to reconstruct the workspace this repo is one
+# third of, and then run that command: CI runs exactly what a developer runs.
 #
-# STILL GATED ON workflow_dispatch, and that is deliberate (D-009): this repo is a
-# child of a pnpm workspace whose root — pnpm-workspace.yaml, the lockfile,
-# tsconfig.base.json, turbo.json — lives one level up and is not checked out here.
-# `pnpm install` cannot resolve `workspace:*` deps from a lone child clone, so the
-# install step below cannot succeed on GitHub yet no matter how correct the rest
-# is. M0-SH-05 owns the fix (multi-repo checkout or a workspace-root action).
-# Flipping the trigger to `pull_request` is a one-line change once it lands, and
-# the rest of this file is written to be correct on that day rather than rewritten
-# on it. Until then the gates are enforced by running `pnpm ci-gates` locally
-# before review; every M0-FE-10 gate has been proven red and green that way.
+# ── D-022: why "reconstruct", not "checkout and install" ───────────────────
+# The Eutectic workspace is ONE pnpm workspace spanning three repos — this one,
+# eutectic-shared and eutectic-backend — but only eutectic-shared tracks the
+# workspace root (pnpm-workspace.yaml, the lockfile, tsconfig.base.json,
+# turbo.json, .nvmrc), as a byte-exact mirror under `workspace-root/`. A lone
+# clone of this repo cannot `pnpm install`: its `workspace:*` dependencies and
+# the lockfile's importers span all three repos, none of which exist relative
+# to a checkout of just this one. So every repo's CI does the same four things:
+#
+#   1. Check out itself at the ref under test (this is the PR's or push's SHA).
+#   2. Check out the OTHER two repos as siblings, pinned to `develop` — a
+#      frontend PR is validated against what backend and shared actually run
+#      on develop today, not against some other in-flight PR.
+#   3. Copy eutectic-shared's tracked `workspace-root/` mirror files up one
+#      level, from the eutectic-shared checkout (not from this repo — this repo
+#      does not carry them). `touch .synthesized-from-mirror` records that the
+#      root here is synthesized, not tracked, which is how eutectic-shared's
+#      own drift check knows to skip itself when it is the one being
+#      reconstructed as a sibling.
+#   4. `pnpm install --frozen-lockfile` against the synthesized root. Frozen:
+#      drift between any repo and the mirrored lockfile fails here, which is
+#      where CLAUDE.md rule 12 (no new dependency without Fable) is actually
+#      enforced for this repo — see D-022 item 1 and D-023's lockstep protocol.
+#
+# `eutectic-frontend/apps/*` is the only glob in the mirrored
+# pnpm-workspace.yaml that names this repo; the repo root package.json (this
+# file's neighbour) is not itself a workspace member, so `pnpm ci-gates` below
+# runs with `working-directory: eutectic-frontend` rather than through
+# `--filter` — see that repo-root package.json's own header.
+#
+# ── Shared packages must be built before this repo is ────────────────────
+# apps/web imports `@eutectic/tokens`, `@eutectic/contracts` and
+# `@eutectic/core` at build time; none of them ship a committed `dist/`
+# (gitignored, correctly), so the workspace install alone is not enough — the
+# packages resolve but have nothing built to resolve *to*. The lesson from
+# M0-BE-24's three red runs: a plain directory filter such as
+# `pnpm --filter "./eutectic-shared/packages/*" run build` builds exactly the
+# packages the filter names and nothing upstream of them — which is correct
+# here precisely because eutectic-shared's three packages (tokens, contracts,
+# core) have no further workspace dependencies of their own to pull in. This is
+# the same filter eutectic-shared's own ci.yml uses to build itself. The
+# alternative form, `pnpm --filter "{./eutectic-frontend/**}..." run build`,
+# would additionally build eutectic-frontend's own workspace packages (it has
+# none) and is not needed here — named in this comment so the next person who
+# reaches for it understands why it was not.
+#
+# ── Node / pnpm ────────────────────────────────────────────────────────────
+# Node comes from the synthesized root's `.nvmrc` (22.12.0 — D-019's floor;
+# Next 15.5 requires it and every §14 budget was measured on it).
+# `scripts/ci-gates.mjs` also refuses to run below it, so a misconfigured
+# runner fails loudly rather than producing numbers that do not describe what
+# ships. pnpm is pinned to 9.15.9 to match the mirrored lockfile's
+# `packageManager` field.
+#
+# ── Playwright ──────────────────────────────────────────────────────────────
+# Lighthouse (§19.6) and Playwright (§19.7) both drive the same Chromium
+# install — one download, one version, so the CLS trace and the Lighthouse run
+# measure the same engine. `--with-deps` installs the shared libraries the
+# runner lacks. M0-FE-14 retires the Linux-baseline skip path in
+# apps/web/e2e/visual.spec.ts: a missing baseline used to skip loudly; it now
+# fails loudly. The six committed `*-chromium-linux.png` baselines are what
+# make that a pass instead of a permanent red — see that file's header for how
+# they were generated, and the `regenerate-baselines` job below for how to
+# regenerate them again from a macOS dev machine.
 name: CI
 
 on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop]
   workflow_dispatch:
-  # M0-SH-05 — uncomment once a child clone can install (D-009):
-  # pull_request:
-  #   branches: [develop, main]
-  # push:
-  #   branches: [develop]
 
 jobs:
   ci-gates:
@@ -33,30 +87,58 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out eutectic-frontend (this ref)
+        uses: actions/checkout@v4
+        with:
+          path: eutectic-frontend
+
+      - name: Check out eutectic-shared @ develop (workspace sibling)
+        uses: actions/checkout@v4
+        with:
+          repository: Sumit-07/eutectic-shared
+          ref: develop
+          path: eutectic-shared
+
+      - name: Check out eutectic-backend @ develop (workspace sibling)
+        uses: actions/checkout@v4
+        with:
+          repository: Sumit-07/eutectic-backend
+          ref: develop
+          path: eutectic-backend
+
+      - name: Synthesize the workspace root from the tracked mirror
+        run: |
+          cp eutectic-shared/workspace-root/package.json \
+             eutectic-shared/workspace-root/pnpm-workspace.yaml \
+             eutectic-shared/workspace-root/pnpm-lock.yaml \
+             eutectic-shared/workspace-root/tsconfig.base.json \
+             eutectic-shared/workspace-root/turbo.json \
+             eutectic-shared/workspace-root/.nvmrc \
+             .
+          touch .synthesized-from-mirror
 
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.9
 
-      # D-019 — the floor is 22.12, not 22.9: Next 15.5 requires it and every §14
-      # budget was measured on it. apps/web/package.json `engines` says the same
-      # thing, and scripts/ci-gates.mjs refuses to run below it rather than
-      # producing numbers that do not describe what ships.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.12.0
+          node-version-file: .nvmrc
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
-      - run: pnpm install --frozen-lockfile
+      - name: Install (frozen — drift between a repo and the lockfile mirror fails here)
+        run: pnpm install --frozen-lockfile
 
-      # Playwright (§19.7) and Lighthouse (§19.6) both drive this browser. One
-      # download, one version, so the CLS trace and the Lighthouse run measure the
-      # same engine. --with-deps installs the shared libraries the runner lacks.
+      - name: Build shared packages (tokens build runs the contrast gate)
+        run: pnpm --filter "./eutectic-shared/packages/*" run build
+
       - name: Install Chromium
         run: pnpm --filter @eutectic/web exec playwright install --with-deps chromium
 
-      - run: pnpm ci-gates
+      - name: Run the frontend-spec §19 gates
+        working-directory: eutectic-frontend
+        run: pnpm ci-gates
 
       # Screenshot diffs and traces are only worth anything when something failed.
       - name: Upload Playwright artefacts
@@ -65,8 +147,8 @@ jobs:
         with:
           name: playwright-artifacts
           path: |
-            apps/web/test-results/
-            apps/web/playwright-report/
+            eutectic-frontend/apps/web/test-results/
+            eutectic-frontend/apps/web/playwright-report/
           retention-days: 7
           if-no-files-found: ignore
 
@@ -75,6 +157,99 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: lighthouse-reports
-          path: apps/web/.next/lighthouse/
+          path: eutectic-frontend/apps/web/.next/lighthouse/
           retention-days: 7
           if-no-files-found: ignore
+
+  # M0-FE-14 — the sanctioned way to regenerate the Linux Playwright baselines
+  # from a macOS dev machine, where Playwright can only ever produce
+  # `-darwin` screenshots. Never runs automatically: baselines are reviewed by
+  # eye before they are committed (see visual.spec.ts's header), so this only
+  # ever runs on an explicit `workflow_dispatch`, and its output is an artifact
+  # for a human to download and commit, never a direct push. This job is a
+  # keeper, not scratch — D-024's protocol needs a repeatable way to produce a
+  # Linux baseline, and this is it.
+  regenerate-baselines:
+    name: regenerate Linux Playwright baselines
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out eutectic-frontend (this ref)
+        uses: actions/checkout@v4
+        with:
+          path: eutectic-frontend
+
+      - name: Check out eutectic-shared @ develop (workspace sibling)
+        uses: actions/checkout@v4
+        with:
+          repository: Sumit-07/eutectic-shared
+          ref: develop
+          path: eutectic-shared
+
+      - name: Check out eutectic-backend @ develop (workspace sibling)
+        uses: actions/checkout@v4
+        with:
+          repository: Sumit-07/eutectic-backend
+          ref: develop
+          path: eutectic-backend
+
+      - name: Synthesize the workspace root from the tracked mirror
+        run: |
+          cp eutectic-shared/workspace-root/package.json \
+             eutectic-shared/workspace-root/pnpm-workspace.yaml \
+             eutectic-shared/workspace-root/pnpm-lock.yaml \
+             eutectic-shared/workspace-root/tsconfig.base.json \
+             eutectic-shared/workspace-root/turbo.json \
+             eutectic-shared/workspace-root/.nvmrc \
+             .
+          touch .synthesized-from-mirror
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install (frozen)
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared packages
+        run: pnpm --filter "./eutectic-shared/packages/*" run build
+
+      - name: Install Chromium
+        run: pnpm --filter @eutectic/web exec playwright install --with-deps chromium
+
+      # Unlike the ci-gates job above, this job invokes Playwright directly
+      # rather than through `pnpm ci-gates` — and `next build` is one of that
+      # gate runner's gates, not something Playwright's webServer does for
+      # itself. Without this step the webServer (`next start`) has no
+      # `.next/` to serve and every test fails before a single screenshot is
+      # written.
+      - name: Build apps/web
+        run: pnpm --filter @eutectic/web run build
+
+      # EUTECTIC_WRITE_BASELINES=1 lifts visual.spec.ts's missing-baseline
+      # failure so the run writes fresh PNGs instead; --update-snapshots=all
+      # forces every snapshot to (re)write regardless of whether one already
+      # exists for this platform, which is what a from-scratch Linux baseline
+      # set needs. D-024's protocol: force-regeneration is only ever for an
+      # intended change, reviewed old-vs-new; this job produces the pixels; a
+      # human reviews and commits them, never this job.
+      - name: Write Linux baselines
+        working-directory: eutectic-frontend
+        env:
+          EUTECTIC_WRITE_BASELINES: '1'
+        run: pnpm --filter @eutectic/web exec playwright test --update-snapshots=all
+
+      - name: Upload baselines
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-baselines
+          path: eutectic-frontend/apps/web/e2e/visual.spec.ts-snapshots/
+          retention-days: 7

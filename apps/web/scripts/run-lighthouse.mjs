@@ -59,16 +59,34 @@ function findChrome() {
     return null;
   }
 
-  const candidates = [
-    path.join('chrome-mac-arm64', 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'),
-    path.join('chrome-mac', 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'),
-    path.join('chrome-linux', 'chrome'),
-    path.join('chrome-win', 'chrome.exe'),
-  ];
+  // M0-FE-14: the extracted folder *inside* each chromium-<rev> revision
+  // directory is not a stable literal — it moved from a bundled Chromium
+  // (`chrome-linux/chrome`) to Chrome for Testing artifacts as Playwright
+  // upgraded, and the runner's actual layout after M0-FE-14's first CI run
+  // was `chrome-linux64/chrome`, not `chrome-linux/chrome` (mac already
+  // carried an arch suffix — `chrome-mac-arm64` — for the same reason).
+  // Pinning one exact literal here rots the next time upstream renames the
+  // folder, so this matches by platform-prefix instead of a fixed name.
+  const platformPrefix =
+    process.platform === 'darwin' ? 'chrome-mac' : process.platform === 'win32' ? 'chrome-win' : 'chrome-linux';
 
   for (const dir of dirs.reverse()) {
-    for (const rel of candidates) {
-      const full = path.join(cache, dir, rel);
+    const revDir = path.join(cache, dir);
+    let children = [];
+    try {
+      children = readdirSync(revDir);
+    } catch {
+      continue;
+    }
+    for (const child of children.filter((c) => c.startsWith(platformPrefix)).sort()) {
+      const base = path.join(revDir, child);
+      const rel =
+        process.platform === 'darwin'
+          ? path.join('Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing')
+          : process.platform === 'win32'
+            ? 'chrome.exe'
+            : 'chrome';
+      const full = path.join(base, rel);
       if (existsSync(full)) return full;
     }
   }
