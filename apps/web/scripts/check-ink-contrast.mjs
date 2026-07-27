@@ -42,7 +42,10 @@ const require = createRequire(pathToFileURL(path.join(webRoot, 'package.json')))
 // run, local or CI, sets it.
 let tokensPath = process.env.EUTECTIC_TOKENS_JSON;
 try {
-  if (!tokensPath) tokensPath = require.resolve('@eutectic/tokens/tokens.json');
+  // M0-FE-14 — TEMPORARY red-proof typo (sabotage 2/2, reverted before
+  // merge): the real subpath is 'tokens.json'; see the PR body's red-proof
+  // table for the run this produced.
+  if (!tokensPath) tokensPath = require.resolve('@eutectic/tokens/tokens-sabotage.json');
 } catch (error) {
   process.stderr.write(
     `${GATE}: FAILED — cannot resolve @eutectic/tokens/tokens.json from apps/web (${error.message})\n`,
