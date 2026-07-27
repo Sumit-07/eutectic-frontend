@@ -1,8 +1,7 @@
 import type { Metadata } from 'next';
 
 import { PrivateShell } from '../../components/shells/private-shell';
-import { HandleField } from '../../components/handles/handle-field';
-import { HandleSubmitButton } from '../../components/handles/handle-submit-button';
+import { HandleForm } from '../../components/handles/handle-form';
 import { getApiClient } from '../../lib/api/client';
 import { submitSettingsHandleAction } from '../../lib/handles/actions';
 
@@ -16,6 +15,14 @@ import { submitSettingsHandleAction } from '../../lib/handles/actions';
  * contract's 409 shape via `lib/handles/errors.ts`. Reads only the session's
  * public handle field — nothing else off `user` (D-029; enforced by
  * `test/handle-no-private-identity-leak.test.mjs`).
+ *
+ * No one-tap "use my GitHub handle" control here (Phase 2, D-041): the
+ * ticket's restored one-tap affordance is scoped to onboarding, matching
+ * Phase 1's own precedent (the removed control only ever existed on
+ * `/welcome/handle`) — a settings-page equivalent would need its own copy
+ * and placement decision this ticket does not make. `HandleForm` (the one
+ * new client leaf, shared by both routes) is the same debounced-checking
+ * control used on `/welcome/handle`, unchanged here beyond that.
  */
 
 export const dynamic = 'force-dynamic';
@@ -59,11 +66,12 @@ export default async function SettingsPage({
             </p>
 
             <form action={submitSettingsHandleAction} className="mt-6">
-              <HandleField
+              <HandleForm
                 label="New handle"
                 htmlFor="settings-handle"
                 defaultValue={submittedValue ?? currentHandle}
-                state={
+                submitLabel="Save handle"
+                serverState={
                   errorMessage
                     ? { kind: 'error', message: errorMessage }
                     : succeeded
@@ -71,9 +79,6 @@ export default async function SettingsPage({
                       : undefined
                 }
               />
-              <div className="mt-6">
-                <HandleSubmitButton>Save handle</HandleSubmitButton>
-              </div>
             </form>
           </>
         ) : (

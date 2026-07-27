@@ -1,39 +1,40 @@
 import type { Metadata } from 'next';
 
-import { HandleField } from '../../../components/handles/handle-field';
-import { HandleSubmitButton } from '../../../components/handles/handle-submit-button';
+import { GithubHandleControl } from '../../../components/handles/github-handle-control';
+import { HandleForm } from '../../../components/handles/handle-form';
 import { getApiClient } from '../../../lib/api/client';
-import { submitOnboardingHandleAction } from '../../../lib/handles/actions';
+import {
+  submitOnboardingGithubHandleAction,
+  submitOnboardingHandleAction,
+} from '../../../lib/handles/actions';
 
 /**
- * Onboarding — handle step (P-08, DIRECTIVE §7 §9, D-029).
+ * Onboarding — handle step (P-08, DIRECTIVE §7 §9, D-029; Phase 2 additions
+ * per D-041).
  *
  * Comes after the forums step and before "meet the staff" (`/staff`, already
  * built). Bare route (frontend-spec §10) — no Feed/Reading/Private shell.
  * `/welcome/forums` and `/first-post` are M1-FE-13's; this route only builds
  * the handle step and does not link past `/staff`.
  *
- * Pseudonym is the DEFAULT path (D-029): the primary control is a form
- * pre-filled with a server-suggested pseudonym via `GET /handles/suggestion`.
+ * Pseudonym is the DEFAULT path (D-029) and stays visually PRIMARY: the
+ * solid-styled form, pre-filled with a server-suggested pseudonym via
+ * `GET /handles/suggestion`, is the first thing on the page.
  *
- * There is deliberately no "use my GitHub handle instead" CONTROL here — an
- * earlier draft linked one to `/auth/github/start`, but for an already-
- * authenticated caller that link only re-runs OAuth and skips this step
- * entirely; it changes nothing and returns the caller to `/staff` with the
- * pseudonym untouched. A control that promises an action it does not perform
- * fails review regardless of a comment explaining it (CTO-Frontend review,
- * this PR). Typing the GitHub name into the field above IS the real one-tap
- * path today — `PUT /me/handle` treats it like any other candidate string,
- * taken/reserved handled by the same error path as this ticket already
- * builds — so the supporting copy below says exactly that. A genuine
- * one-tap "use my GitHub handle" affordance needs the contract to expose the
- * caller's own GitHub login as something other than an opt-in field that may
- * be absent — nothing does that today — out of this ticket's lane, escalated
- * to Fable.
+ * Phase 1 removed a "use my GitHub handle instead" link here because it
+ * re-ran OAuth for an already-authenticated caller and did nothing — "a
+ * control that promises an action it does not perform fails review
+ * regardless of a comment explaining it" (CTO-Frontend review, PR #14). The
+ * contract gap that forced that removal is now closed (D-041:
+ * `HandleUpdateFromGitHub`, `{ use_github_login: true }`), so
+ * `GithubHandleControl` restores the block as a real, secondary (outline)
+ * affordance below the pseudonym form — see that component's own doc
+ * comment for how it stays out of the private-identity invariant.
  *
- * INTERIM wiring (ticket item 8): `submitOnboardingHandleAction` is a Server
- * Action — zero new client leaves. Errors come back as query parameters this
- * page reads and renders server-side.
+ * Both forms post via Server Actions — Phase 1's no-JS wiring, unchanged in
+ * kind. `HandleForm` (Phase 2's one approved client leaf, D-041) enhances the
+ * pseudonym form's typing experience with debounced availability checking;
+ * it does not touch how either form submits.
  */
 
 export const dynamic = 'force-dynamic';
@@ -57,6 +58,7 @@ export default async function WelcomeHandlePage({
   const params = await searchParams;
   const errorMessage = first(params.handle_error_message);
   const submittedValue = first(params.handle_value);
+  const githubErrorMessage = first(params.github_error_message);
 
   const suggestion = submittedValue ?? (await getApiClient().suggestHandle()).handle;
 
@@ -72,22 +74,15 @@ export default async function WelcomeHandlePage({
       </p>
 
       <form action={submitOnboardingHandleAction} className="mt-8">
-        <HandleField
+        <HandleForm
           htmlFor="onboarding-handle"
           defaultValue={suggestion}
-          state={errorMessage ? { kind: 'error', message: errorMessage } : undefined}
+          submitLabel="Continue"
+          serverState={errorMessage ? { kind: 'error', message: errorMessage } : undefined}
         />
-        <div className="mt-6">
-          <HandleSubmitButton>Continue</HandleSubmitButton>
-        </div>
       </form>
 
-      <div className="mt-8 border-t border-rule-soft pt-6">
-        <p className="font-ui text-meta text-ink-quiet">
-          Prefer the name on your GitHub account? Type it in above — it&rsquo;s
-          yours to claim like any other handle.
-        </p>
-      </div>
+      <GithubHandleControl action={submitOnboardingGithubHandleAction} errorMessage={githubErrorMessage} />
     </main>
   );
 }

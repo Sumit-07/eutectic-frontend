@@ -5,10 +5,12 @@
 //
 // Two assertions, both ratchets:
 //
-//   1. TOTAL. apps/web contains exactly six files with a real `'use client'`
-//      directive today (D-018 counted them and called them "justified leaves").
-//      A seventh fails this gate. That is the requirement in the ticket and the
-//      one number a reviewer can hold in their head.
+//   1. TOTAL. apps/web contains exactly seven files with a real `'use client'`
+//      directive today (D-018 counted the first six and called them "justified
+//      leaves"; D-041 approved a seventh — P-08 Phase 2's `handle-form.tsx` —
+//      and raised the ratchet in the same PR that added the file). An eighth
+//      fails this gate. That is the requirement in the ticket and the one
+//      number a reviewer can hold in their head.
 //   2. PER ROUTE. §19.5 is written per route, so the import graph is walked from
 //      every route entry in `src/app` and the client leaves reachable from each
 //      are counted. The per-route ceiling is 4 — the measured maximum today
@@ -45,7 +47,13 @@ import { blankComments, listSourceFiles, read, webRoot } from './lib/sources.mjs
 
 const GATE = 'client-components';
 
-const TOTAL_CEILING = 6; // D-018: six justified leaves
+// D-018 set six; D-041 raises it to seven for P-08 Phase 2's `handle-form.tsx`
+// (debounced availability checking, shared by `/welcome/handle` and
+// `/settings`) — Fable's ruling was explicit that the ceiling may change in
+// THIS PR and no other, so a future seventh-and-then-some leaf needs its own
+// DECISIONS.md entry before touching this constant again, exactly as D-018
+// required the first time.
+const TOTAL_CEILING = 7; // D-018 (six) + D-041 (seven): the one new leaf this ticket adds
 const PER_ROUTE_CEILING = 4; // measured maximum today (/probe/primitives), no headroom
 
 const ROUTE_ENTRY_BASENAMES = new Set([

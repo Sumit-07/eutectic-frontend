@@ -6,8 +6,13 @@ import { HandleField } from './handle-field';
 import { describeAvailability, describeHandleChangeError } from '../../lib/handles/errors';
 
 /**
- * P-08 — the six states the ticket names: default, pre-filled suggestion,
- * availability-taken, invalid, cooldown-blocked (fixed date), success.
+ * P-08 Phase 1 — the six states the ticket named: default, pre-filled
+ * suggestion, availability-taken, invalid, cooldown-blocked (fixed date),
+ * success. Phase 2 (D-041) adds `Checking` and `Available` — the two new
+ * `HandleFieldState` kinds `handle-form.tsx`'s debounced availability check
+ * renders while typing. Together with `AvailabilityTaken`/`Invalid`/
+ * `CooldownBlocked` below, that is 6 of the 7 states the Phase 2 ticket
+ * names; the 7th, "one-tap variant", is `github-handle-control.stories.tsx`.
  *
  * The error copy in every non-idle story is produced by calling
  * `lib/handles/errors.ts` directly, the same module the real forms call —
@@ -31,6 +36,20 @@ export const Default: Story = {
 export const PreFilledSuggestion: Story = {
   name: 'Pre-filled suggestion',
   render: () => <HandleField htmlFor="handle-suggestion" defaultValue="bricklayer-49q" />,
+};
+
+export const Checking: Story = {
+  name: 'Availability — checking (live, Phase 2)',
+  render: () => (
+    <HandleField htmlFor="handle-checking" defaultValue="mira" state={{ kind: 'checking' }} />
+  ),
+};
+
+export const Available: Story = {
+  name: 'Availability — available (live, Phase 2)',
+  render: () => (
+    <HandleField htmlFor="handle-available" defaultValue="bricklayer-49q" state={{ kind: 'available' }} />
+  ),
 };
 
 export const AvailabilityTaken: Story = {
