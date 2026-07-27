@@ -1,0 +1,1 @@
+M0-FE-14 TEMPORARY red-proof fixture: not a real font file. Trips font-budget's unexpected-woff2 check. Reverted before merge.
