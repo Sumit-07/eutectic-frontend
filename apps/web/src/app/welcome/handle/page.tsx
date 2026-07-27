@@ -4,7 +4,6 @@ import { HandleField } from '../../../components/handles/handle-field';
 import { HandleSubmitButton } from '../../../components/handles/handle-submit-button';
 import { getApiClient } from '../../../lib/api/client';
 import { submitOnboardingHandleAction } from '../../../lib/handles/actions';
-import { githubStartUrl } from '../../../lib/api/auth-urls';
 
 /**
  * Onboarding — handle step (P-08, DIRECTIVE §7 §9, D-029).
@@ -16,14 +15,21 @@ import { githubStartUrl } from '../../../lib/api/auth-urls';
  *
  * Pseudonym is the DEFAULT path (D-029): the primary control is a form
  * pre-filled with a server-suggested pseudonym via `GET /handles/suggestion`.
- * "Use my GitHub handle instead" is a deliberate, secondary one-tap
- * alternative — rendered as a plain link to the same `/auth/github/start`
- * redirect `/login` uses, never by reading the caller's GitHub identity in
- * this app's source (nothing in P-08 should — see the D-029 invariant test,
- * `test/handle-no-private-identity-leak.test.mjs`). Filling the field with
- * the caller's actual GitHub login on return is a real behaviour the contract
- * does not specify yet; flagged in the PR as a follow-up for CTO-Backend/Fable,
- * not invented here.
+ *
+ * There is deliberately no "use my GitHub handle instead" CONTROL here — an
+ * earlier draft linked one to `/auth/github/start`, but for an already-
+ * authenticated caller that link only re-runs OAuth and skips this step
+ * entirely; it changes nothing and returns the caller to `/staff` with the
+ * pseudonym untouched. A control that promises an action it does not perform
+ * fails review regardless of a comment explaining it (CTO-Frontend review,
+ * this PR). Typing the GitHub name into the field above IS the real one-tap
+ * path today — `PUT /me/handle` treats it like any other candidate string,
+ * taken/reserved handled by the same error path as this ticket already
+ * builds — so the supporting copy below says exactly that. A genuine
+ * one-tap "use my GitHub handle" affordance needs the contract to expose the
+ * caller's own GitHub login as something other than an opt-in field that may
+ * be absent — nothing does that today — out of this ticket's lane, escalated
+ * to Fable.
  *
  * INTERIM wiring (ticket item 8): `submitOnboardingHandleAction` is a Server
  * Action — zero new client leaves. Errors come back as query parameters this
@@ -78,15 +84,9 @@ export default async function WelcomeHandlePage({
 
       <div className="mt-8 border-t border-rule-soft pt-6">
         <p className="font-ui text-meta text-ink-quiet">
-          Would rather post under the name attached to your GitHub account?
-          You can do that instead — or switch to it later from settings.
+          Prefer the name on your GitHub account? Type it in above — it&rsquo;s
+          yours to claim like any other handle.
         </p>
-        <a
-          href={githubStartUrl('/staff')}
-          className="mt-3 inline-flex items-center justify-center rounded-sm border border-rule-strong px-6 py-4 font-ui font-emphasis text-label text-ink hover:bg-paper-hover"
-        >
-          Use my GitHub handle instead
-        </a>
       </div>
     </main>
   );

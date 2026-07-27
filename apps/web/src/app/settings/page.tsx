@@ -51,29 +51,34 @@ export default async function SettingsPage({
       <section className="mt-8">
         <h2 className="font-ui font-emphasis text-label text-ink">Handle</h2>
 
-        <p className="mt-2 font-ui text-body text-ink-soft">
-          {currentHandle !== null
-            ? <>You currently post as <strong className="font-medium">{currentHandle}</strong>. You can change it once every 90 days.</>
-            : 'You are not signed in.'}
-        </p>
+        {currentHandle !== null ? (
+          <>
+            <p className="mt-2 font-ui text-body text-ink-soft">
+              You currently post as <strong className="font-medium">{currentHandle}</strong>. You
+              can change it once every 90 days.
+            </p>
 
-        <form action={submitSettingsHandleAction} className="mt-6">
-          <HandleField
-            label="New handle"
-            htmlFor="settings-handle"
-            defaultValue={submittedValue ?? currentHandle ?? ''}
-            state={
-              errorMessage
-                ? { kind: 'error', message: errorMessage }
-                : succeeded
-                  ? { kind: 'success', message: 'Your handle was updated.' }
-                  : undefined
-            }
-          />
-          <div className="mt-6">
-            <HandleSubmitButton>Save handle</HandleSubmitButton>
-          </div>
-        </form>
+            <form action={submitSettingsHandleAction} className="mt-6">
+              <HandleField
+                label="New handle"
+                htmlFor="settings-handle"
+                defaultValue={submittedValue ?? currentHandle}
+                state={
+                  errorMessage
+                    ? { kind: 'error', message: errorMessage }
+                    : succeeded
+                      ? { kind: 'success', message: 'Your handle was updated.' }
+                      : undefined
+                }
+              />
+              <div className="mt-6">
+                <HandleSubmitButton>Save handle</HandleSubmitButton>
+              </div>
+            </form>
+          </>
+        ) : (
+          <p className="mt-2 font-ui text-body text-ink-soft">You are not signed in.</p>
+        )}
       </section>
     </PrivateShell>
   );

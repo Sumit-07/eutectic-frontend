@@ -49,6 +49,47 @@ test('describeHandleChangeError: 409 handle_cooldown — the contract example, v
   assert.match(result.message, /Oct/);
 });
 
+test('describeHandleChangeError: cooldown under 7 days out is still an absolute date, never a bare magnitude', () => {
+  // A user retrying near the end of their 90-day window: `until` is 3 days
+  // from `now`. `@eutectic/core`'s `relativeTime` would render this as "3d"
+  // (its under-7-days magnitude ladder) — a cooldown is a deadline, not an
+  // age, so the message must always read as a date, regardless of how close.
+  const body = {
+    error: {
+      code: 'handle_cooldown',
+      message: 'handle changed within the last 90 days',
+      details: [{ field: 'handle', issue: 'cooldown_until', detail: '2026-07-30T00:00:00Z' }],
+      request_id: '01J8Z6R2F3M4N5P6Q7R8S9T0V1',
+    },
+  };
+  const error = new ApiError(409, body);
+  const now = new Date('2026-07-27T00:00:00Z');
+
+  const result = describeHandleChangeError(error, now);
+
+  assert.equal(result.kind, 'cooldown');
+  assert.match(result.message, /Jul 30/);
+  assert.doesNotMatch(result.message, /\bd\b|\d+d\b/);
+});
+
+test('describeHandleChangeError: cooldown crossing into next year includes the year', () => {
+  const body = {
+    error: {
+      code: 'handle_cooldown',
+      message: 'handle changed within the last 90 days',
+      details: [{ field: 'handle', issue: 'cooldown_until', detail: '2027-01-15T00:00:00Z' }],
+      request_id: '01J8Z6R2F3M4N5P6Q7R8S9T0V1',
+    },
+  };
+  const error = new ApiError(409, body);
+  const now = new Date('2026-11-01T00:00:00Z');
+
+  const result = describeHandleChangeError(error, now);
+
+  assert.equal(result.kind, 'cooldown');
+  assert.match(result.message, /Jan 15, 2027/);
+});
+
 test('describeHandleChangeError: 422 unprocessable — one outcome per reason', () => {
   const now = new Date('2026-07-27T00:00:00Z');
   for (const reason of ['taken', 'reserved', 'invalid', 'cooldown_held']) {

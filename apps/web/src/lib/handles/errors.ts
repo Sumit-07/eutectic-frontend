@@ -13,7 +13,6 @@
  * the SERVER already decided, never a client-side guess.
  */
 
-import { relativeTime } from '@eutectic/core';
 import { ApiError } from '@eutectic/contracts';
 import type { Schemas } from '@eutectic/contracts';
 
@@ -72,6 +71,28 @@ export interface HandleUnknownError {
 export type HandleChangeError = HandleCooldownError | HandleRejectedError | HandleUnknownError;
 
 /**
+ * A cooldown is a deadline, not an age — always an absolute date, never
+ * `@eutectic/core`'s `relativeTime`, whose under-7-days ladder would render a
+ * bare magnitude like "3d" for someone retrying near the end of their 90-day
+ * window (reachable, and wrong: "3d" reads as an elapsed duration, not a date
+ * to come back on). This mirrors `relativeTime`'s own absolute-date fallback
+ * recipe — month short, day numeric, year only when it differs from `now`'s —
+ * without importing it or touching `@eutectic/core` (shared, out of this
+ * ticket's lane): `No date library` (CLAUDE.md rule 12) is satisfied the same
+ * way `relativeTime` satisfies it, with `Intl.DateTimeFormat` only.
+ */
+function formatCooldownDate(until: string, now: Date): string {
+  const target = new Date(until);
+  const yearOf = (date: Date): string => new Intl.DateTimeFormat('en', { year: 'numeric' }).format(date);
+  const includeYear = yearOf(target) !== yearOf(now);
+  return new Intl.DateTimeFormat('en', {
+    month: 'short',
+    day: 'numeric',
+    year: includeYear ? 'numeric' : undefined,
+  }).format(target);
+}
+
+/**
  * `PUT /me/handle`'s two failure shapes, mapped to something a page can render:
  *
  *   409 `handle_cooldown`     — the caller's own 90-day cooldown is running.
@@ -101,7 +122,7 @@ export function describeHandleChangeError(error: unknown, now: Date): HandleChan
     return {
       kind: 'cooldown',
       until,
-      message: `You changed your handle recently. You can change it again on ${relativeTime(until, now)}.`,
+      message: `You changed your handle recently. You can change it again on ${formatCooldownDate(until, now)}.`,
     };
   }
 
